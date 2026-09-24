@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Cola de tickets Smart Central",
+  "version": "0.3.2",
+  "description": "Carga tickets en cola usando la sesion abierta de Smart Central.",
+  "permissions": ["storage", "tabs", "sidePanel", "scripting"],
+  "host_permissions": [
+    "https://central.smartsouth.net/*",
+    "https://raw.githubusercontent.com/matiasSerantes/AyudanteGitGlpimat/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Abrir cola de tickets"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://central.smartsouth.net/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

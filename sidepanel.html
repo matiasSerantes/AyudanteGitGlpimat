@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cola de tickets</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">SMART CENTRAL</p>
+      <h1>Cola de tickets</h1>
+    </div>
+    <span id="connectionBadge" class="badge neutral">Sin comprobar</span>
+  </header>
+
+  <main>
+    <section id="loginNotice" class="notice hidden" aria-live="polite">
+      <div>
+        <strong>Hace falta iniciar sesion</strong>
+        <p>La cola queda guardada y pausada.</p>
+      </div>
+      <button id="openCentralButton" class="secondary">Abrir Central</button>
+    </section>
+
+    <nav class="tabs" aria-label="Vistas">
+      <button class="tab active" data-view="editor">Nuevo</button>
+      <button class="tab" data-view="queue">Cola <span id="queueCount">0</span></button>
+    </nav>
+
+    <section id="editorView" class="view active">
+      <form id="ticketForm" autocomplete="off">
+        <div class="template-toolbar">
+          <div class="field template-select">
+            <label for="templateSelect">Plantilla</label>
+            <select id="templateSelect">
+              <option value="">Sin plantilla</option>
+            </select>
+          </div>
+          <div class="template-actions">
+            <button id="applyTemplateButton" type="button" class="secondary small">Aplicar</button>
+            <button id="saveTemplateButton" type="button" class="secondary small">Guardar</button>
+            <button id="deleteTemplateButton" type="button" class="ghost small">Eliminar</button>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label for="entity">Entidad / cliente</label>
+          <select id="entity" name="entity" required>
+            <option value="" selected>Selecciona una entidad</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="technician">Tecnico responsable</label>
+          <select id="technician" name="technician" required>
+            <option value="" selected>Selecciona un tecnico</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="title">Titulo</label>
+          <input id="title" name="title" value="Relevamiento de Conexion" required>
+        </div>
+
+        <div class="field full">
+          <label for="description">Descripcion</label>
+          <textarea id="description" name="description" rows="5" placeholder="Detalle del trabajo realizado" required></textarea>
+        </div>
+
+        <div class="grid two">
+          <div class="field">
+            <label for="serviceType">Tipo de servicio</label>
+            <select id="serviceType" name="serviceType" required>
+              <option selected>Soporte remoto</option>
+              <option>Soporte in situ</option>
+              <option>Ciberseguridad e infraestructura</option>
+              <option>Guardia</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ticketType">Tipo</label>
+            <select id="ticketType" name="ticketType" required>
+              <option selected>Incidente</option>
+              <option>Solicitud</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label for="category">Categoria GLPI</label>
+          <select id="category" name="category" required>
+            <option value="" selected disabled>Selecciona una categoria</option>
+            <option>Ciberseguridad</option>
+            <option>Dominio</option>
+            <option>Gesti&oacute;n</option>
+            <option>Hardware</option>
+            <option>Infraestructura</option>
+            <option>Microinform&aacute;tica</option>
+            <option>Monitoreo</option>
+            <option>Networking</option>
+            <option>Networking &gt; Access Point</option>
+            <option>Networking &gt; habilitar ip publica</option>
+            <option>Software</option>
+            <option>Software &gt; Solicitud de Licencia</option>
+          </select>
+        </div>
+
+        <div class="grid two">
+          <div class="field">
+            <label for="priority">Prioridad</label>
+            <select id="priority" name="priority">
+              <option>Muy baja</option>
+              <option>Baja</option>
+              <option selected>Media</option>
+              <option>Alta</option>
+              <option>Muy alta</option>
+            </select>
+          </div>
+          <label class="check-field">
+            <input id="pastAttention" name="pastAttention" type="checkbox">
+            <span>Usar dia y hora indicado</span>
+          </label>
+        </div>
+
+        <div id="attentionDateWrap" class="field full">
+          <label for="attentionDate">Dia y hora del ticket</label>
+          <input id="attentionDate" name="attentionDate" type="datetime-local">
+        </div>
+
+        <label class="check-field completion-toggle">
+          <input id="closeAfterCreate" name="closeAfterCreate" type="checkbox">
+          <span>Registrar trabajo y cerrar ticket</span>
+        </label>
+
+        <div id="completionFields" class="completion-fields hidden">
+          <div class="field full">
+            <label for="billableTime">Tiempo facturable</label>
+            <select id="billableTime" name="billableTime">
+              <option>Sin intervencion</option>
+              <option selected>0,5 h</option>
+              <option>1 h</option>
+              <option>1,5 h</option>
+              <option>2 h</option>
+              <option>2,5 h</option>
+              <option>3 h</option>
+              <option>3,5 h</option>
+              <option>4 h</option>
+              <option>4,5 h</option>
+              <option>5 h</option>
+              <option>5,5 h</option>
+              <option>6 h</option>
+              <option>6,5 h</option>
+              <option>7 h</option>
+              <option>7,5 h</option>
+              <option>8 h</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="customerMessage">Mensaje al cliente / solucion</label>
+            <textarea id="customerMessage" name="customerMessage" rows="4" placeholder="Resultado o respuesta para el cliente"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="clearFormButton" type="button" class="ghost">Limpiar</button>
+          <button id="addButton" type="submit" class="primary">Agregar a la cola</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="queueView" class="view">
+      <div class="queue-toolbar">
+        <div>
+          <strong id="queueSummary">0 pendientes</strong>
+          <p id="runStatus">La cola esta detenida.</p>
+        </div>
+        <button id="clearCompletedButton" class="ghost small">Limpiar enviados</button>
+      </div>
+
+      <ol id="queueList" class="queue-list"></ol>
+      <div id="emptyQueue" class="empty-state">
+        <strong>No hay tickets en cola</strong>
+        <p>Agrega el primero desde la pestana Nuevo.</p>
+      </div>
+
+      <div class="runbar">
+        <button id="pauseButton" class="secondary hidden">Pausar</button>
+        <button id="startButton" class="primary" disabled>Iniciar cola</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <p class="eyebrow">CONFIRMAR ENVIO</p>
+      <h2>Crear tickets en Smart Central</h2>
+      <p id="confirmText"></p>
+      <div id="confirmPreview" class="confirm-preview"></div>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">Cancelar</button>
+        <button id="confirmStartButton" value="confirm" class="primary">Crear tickets</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
