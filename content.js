@@ -17,8 +17,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === "central.listReady") {
-    const formOpen = findControl("titulo", "input") || findControl("descripcion", "textarea");
-    sendResponse({ ready: Boolean(findButton(["nuevo ticket"])) && !formOpen && !readTicketSuccess() });
+    sendResponse({ ready: Boolean(findButton(["nuevo ticket"])) && !isTicketFormOpen() && !readTicketSuccess() });
   }
   if (message.type === "central.catalogs") {
     sendResponse(readCatalogsFromOpenForm());
@@ -27,7 +26,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 function probePage() {
   const canOpen = findButton(["nuevo ticket", "crear ticket", "new ticket"]);
-  const formOpen = findControl("titulo", "input") || findControl("descripcion", "textarea");
+  const formOpen = isTicketFormOpen();
   if (canOpen || formOpen) return { ready: true };
   if (isLoginPage()) return { ready: false, reason: "Inicia sesion en Central para continuar." };
   return { ready: false, reason: "Abre la seccion Mesa de ayuda y activos para continuar." };
@@ -103,7 +102,7 @@ async function createTicket(ticket) {
 
 function startReturnToTicketList() {
   const success = readTicketSuccess();
-  const formOpen = findControl("titulo", "input") || findControl("descripcion", "textarea");
+  const formOpen = isTicketFormOpen();
   if (!success && !formOpen && findButton(["nuevo ticket"])) {
     return { ok: true, alreadyAtList: true };
   }
@@ -209,11 +208,17 @@ async function waitForTicketClosure(reference) {
 }
 
 async function openTicketForm() {
-  if (findControl("titulo", "input") && findControl("descripcion", "textarea")) return;
+  if (isTicketFormOpen()) return;
   const openButton = findButton(["nuevo ticket"]);
   if (!openButton) throw new Error("No se encontro el boton Nuevo ticket.");
   openButton.click();
-  await waitUntil(() => findControl("titulo", "input") && findControl("descripcion", "textarea"), CONTROL_TIMEOUT, "No se abrio el formulario de nuevo ticket.");
+  await waitUntil(isTicketFormOpen, CONTROL_TIMEOUT, "No se abrio el formulario de nuevo ticket.");
+}
+
+function isTicketFormOpen() {
+  const title = findControl("titulo", "input");
+  const description = findControl("descripcion", "textarea");
+  return Boolean(title && description && isVisible(title) && isVisible(description));
 }
 
 function findControl(labelText, preferredTag) {
@@ -390,7 +395,7 @@ function findTicketCloseButton() {
 
 function findButton(texts) {
   const wanted = texts.map(normalize);
-  const actions = [...document.querySelectorAll("button, [role=button], input[type=submit], a[href]")];
+  const actions = [...document.querySelectorAll("button, [role=button], input[type=submit], a[href]")].filter(isVisible);
   return actions.find((button) => {
     const text = normalize(button.textContent || button.value || button.getAttribute("aria-label") || "");
     return wanted.some((item) => text === item);
