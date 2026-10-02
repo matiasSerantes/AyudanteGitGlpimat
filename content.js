@@ -1,4 +1,6 @@
 const CONTROL_TIMEOUT = 12000;
+const TICKET_CLOSURE_TIMEOUT = 45000;
+const POST_CLOSURE_RETURN_TIMEOUT = 20000;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "central.probe") {
@@ -180,7 +182,7 @@ function findOperationalCloseButton() {
 
 async function waitForTicketClosure(reference) {
   const started = Date.now();
-  while (Date.now() - started < 20000) {
+  while (Date.now() - started < TICKET_CLOSURE_TIMEOUT) {
     const detail = readTicketDetail();
     if (!detail && findButton(["nuevo ticket"])) return;
 
@@ -193,7 +195,7 @@ async function waitForTicketClosure(reference) {
       if (dismiss) dismiss.click();
       await waitUntil(
         () => Boolean(findButton(["nuevo ticket"])) && !readTicketDetail(),
-        CONTROL_TIMEOUT,
+        POST_CLOSURE_RETURN_TIMEOUT,
         `El ticket ${reference || ""} se cerro, pero no se pudo volver a la lista.`
       );
       return;
