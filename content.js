@@ -91,6 +91,7 @@ async function createTicket(ticket) {
   await setSelect("tipo", ticket.ticketType);
   await setSelect("categoria glpi", ticket.category);
   await setSelect("prioridad", ticket.priority);
+  await attachFieldImages(findControl("descripcion", "textarea"), ticket.attachments?.description, "Descripcion");
 
   const submit = findButton(["crear ticket"]);
   if (!submit) throw new Error("No se encontro el boton Crear ticket.");
@@ -125,6 +126,14 @@ async function finalizeTicket(ticket) {
   await openTicketDetail(ticket);
   await setSelect("tiempo facturable", ticket.billableTime);
   setCustomerMessage(ticket.customerMessage);
+  for (const [field, label] of [["workDetail", "detalle para el cliente / motivo"], ["internalNote", "nota interna"], ["customerMessage", "mensaje al cliente / solucion"]]) {
+    const images = ticket.attachments?.[field] || [];
+    if (!ticket[field] && !images.length) continue;
+    const control = findControl(label, "textarea");
+    if (!control) throw new Error(`No se encontro el campo ${label}.`);
+    if (field !== "customerMessage") setNativeValue(control, ticket[field] || "");
+    await attachFieldImages(control, images, label);
+  }
 
   const closeButton = findOperationalCloseButton();
   if (!closeButton) throw new Error("No se encontro el boton operativo Cerrar del ticket.");
@@ -444,3 +453,34 @@ function waitUntil(check, timeout, message) {
 }
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+
+async function attachFieldImages(control, images, label) {
+  if (!images?.length) return;
+  if (!control) throw new Error(`No se encontro el campo ${label} para adjuntar imagenes.`);
+  // Only use a file input belonging to this field, never another field's picker.
+  let container = control.parentElement;
+  let picker = null;
+  while (container && container !== document.body) {
+    if (container.querySelectorAll("textarea").length > 1) break;
+    const candidates = [...container.querySelectorAll('input[type="file"]')];
+    if (candidates.length === 1) { picker = candidates[0]; break; }
+    container = container.parentElement;
+  }
+  if (!picker) throw new Error(`No se encontro el selector de imagenes de ${label}. La cola se pausa antes de enviar; revisa el formulario de Central.`);
+  for (const attachment of images) {
+    const match = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/.exec(attachment.dataUrl || "");
+    if (!match) throw new Error(`Imagen invalida en ${label}.`);
+    const bytes = Uint8Array.from(atob(match[2]), character => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], attachment.name, { type: match[1] }));
+    const previousValue = control.value;
+    picker.value = "";
+    picker.files = transfer.files;
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    // Central's image importer inserts the image into the associated text.
+    // Do not submit while an import is still pending or unconfirmed.
+    await waitUntil(() => control.value !== previousValue, CONTROL_TIMEOUT,
+      `Central no confirmo la imagen ${attachment.name} en ${label}. Revisa el ticket antes de reintentar.`);
+  }
+}

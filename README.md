@@ -40,3 +40,11 @@ El actualizador descarga la rama `main` de `matiasSerantes/AyudanteGitGlpimat`. 
 ## Primera prueba
 
 Proba inicialmente con un solo ticket real y una categoria conocida. La interfaz de Central puede usar controles personalizados; si algun campo no coincide, el mensaje de error indica cual selector debe ajustarse en `content.js`.
+
+## Imagenes
+
+La version 0.3.4 agrega botones Imagen en Descripcion, Detalle para el cliente / motivo, Nota interna y Mensaje al cliente / solucion. Acepta PNG, JPG, GIF y WebP, permite revisar y quitar cada imagen, y guarda los archivos con el borrador y la cola. Cada imagen admite hasta 4 MB. Los tres campos de trabajo se envian al activar Registrar trabajo y cerrar ticket. Las imagenes no se guardan en las plantillas.
+
+La extension usa el selector de archivos del propio campo de Central y espera que la imagen se incorpore al texto antes de enviar. Si Central usa otra estructura o no confirma la importacion, la cola se pausa. Esta integracion debe verificarse con un ticket real en la sesion de Central.
+
+En la version 0.3.5 tambien podes copiar una imagen o sacar una captura al portapapeles (por ejemplo con Win+Shift+S), hacer clic dentro del campo correspondiente y pulsar Ctrl+V. Aparece como adjunto con vista previa y se guarda igual que una imagen importada. El pegado de texto sigue funcionando. No hace falta guardar la captura ni dar permisos adicionales al portapapeles.

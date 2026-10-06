@@ -23,6 +23,7 @@ const form = $("#ticketForm");
 const toast = $("#toast");
 
 document.addEventListener("DOMContentLoaded", async () => {
+  setupImageAttachments();
   bindEvents();
   await loadCatalogs();
   await restoreState();
@@ -95,12 +96,18 @@ function readForm() {
     attentionDate: String(data.get("attentionDate") || ""),
     closeAfterCreate: data.get("closeAfterCreate") === "on",
     billableTime: String(data.get("billableTime") || "0,5 h"),
+    attachments: structuredClone(draftAttachments),
+    workDetail: String(data.get("workDetail") || "").trim(),
+    internalNote: String(data.get("internalNote") || "").trim(),
     customerMessage: String(data.get("customerMessage") || "").trim(),
   };
 }
 
 function applyTicketToForm(ticket) {
-  for (const key of ["entity", "technician", "title", "description", "serviceType", "ticketType", "category", "priority", "attentionDate", "billableTime", "customerMessage"]) {
+  draftAttachments = structuredClone(ticket.attachments || {});
+  renderAttachments();
+  for (const field of ["workDetail", "internalNote"]) form.elements[field].value = ticket[field] || "";
+  for (const key of ["entity", "technician", "title", "description", "serviceType", "ticketType", "category", "priority", "attentionDate", "billableTime", "customerMessage", "workDetail", "internalNote"]) {
     if (ticket[key] !== undefined && form.elements[key]) setFieldValue(form.elements[key], ticket[key]);
   }
   form.elements.pastAttention.checked = Boolean(ticket.pastAttention);
@@ -431,7 +438,8 @@ function renderQueue() {
         <button class="icon-button" data-action="delete" title="Eliminar" aria-label="Eliminar">&times;</button>
       </div>`;
     row.querySelector("strong").textContent = item.title;
-    const workflow = item.closeAfterCreate ? " | Crear y cerrar" : "";
+    const imageCount = Object.values(item.attachments || {}).reduce((total, images) => total + images.length, 0);
+    const workflow = (item.closeAfterCreate ? " | Crear y cerrar" : "") + (imageCount ? ` | ${imageCount} imagen(es)` : "");
     row.querySelector(".ticket-main span").textContent = `${item.entity} | ${status}${workflow}`;
     list.appendChild(row);
   }
@@ -731,3 +739,119 @@ function showToast(message, isError = false) {
 }
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+
+let draftAttachments = {};
+const IMAGE_FIELDS = ["description", "workDetail", "internalNote", "customerMessage"];
+let readingImages = false;
+
+function setupImageAttachments() {
+  for (const field of IMAGE_FIELDS) {
+    const label = document.querySelector(`label[for="${field}"]`);
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = "image/png,image/jpeg,image/gif,image/webp";
+    picker.multiple = true;
+    picker.hidden = true;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary small attachment-button";
+    button.textContent = "\u{1F4CE} Imagen";
+    button.title = `Adjuntar imagen: ${label.textContent}`;
+    button.addEventListener("click", () => picker.click());
+    label.append(" ", button);
+    label.after(picker);
+    const list = document.createElement("div");
+    list.id = `${field}Attachments`;
+    list.className = "attachment-list";
+    document.getElementById(field).after(list);
+    picker.addEventListener("change", async () => {
+      await addFieldImages(field, [...picker.files]);
+      picker.value = "";
+    });
+    const textarea = document.getElementById(field);
+    textarea.addEventListener("paste", event => handleImagePaste(event, field));
+    const hint = document.createElement("small");
+    hint.className = "attachment-hint";
+    hint.textContent = "Tambien podes pegar una captura o imagen con Ctrl+V en este campo.";
+    textarea.after(hint);
+  }
+}
+
+async function handleImagePaste(event, field) {
+  const files = [...(event.clipboardData?.items || [])]
+    .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+    .map(item => item.getAsFile())
+    .filter(Boolean);
+  if (!files.length) return; // Leave ordinary text pasting to the browser.
+  // Keep native text pasting when the clipboard contains both text and images.
+  if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+  if (await addFieldImages(field, files)) showToast("Imagen pegada y guardada en este campo.");
+}
+
+async function addFieldImages(field, files) {
+  if (!files.length) return false;
+  if (readingImages) {
+    showToast("Espera a que termine de cargar la imagen anterior y volve a pegar o importar.", true);
+    return false;
+  }
+  readingImages = true;
+  document.getElementById("addButton").disabled = true;
+  const previous = structuredClone(draftAttachments);
+  try {
+    const images = [];
+    for (const file of files) {
+      if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) throw new Error("Selecciona imagenes PNG, JPG, GIF o WebP.");
+      if (file.size > 4 * 1024 * 1024) throw new Error("Cada imagen puede ocupar hasta 4 MB.");
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+        reader.readAsDataURL(file);
+      });
+      const extension = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[file.type];
+      images.push({ name: file.name || `captura-${Date.now()}-${images.length + 1}.${extension}`, type: file.type, dataUrl });
+    }
+    draftAttachments[field] = [...(draftAttachments[field] || []), ...images];
+    if (JSON.stringify(draftAttachments).length > 12 * 1024 * 1024) throw new Error("Las imagenes del ticket superan el limite de 9 MB. Quita alguna imagen.");
+    await saveDraft();
+    return true;
+  } catch (error) {
+    draftAttachments = previous;
+    showToast(error.message, true);
+    return false;
+  } finally {
+    readingImages = false;
+    document.getElementById("addButton").disabled = false;
+    renderAttachments();
+  }
+}
+
+function renderAttachments() {
+  for (const field of IMAGE_FIELDS) {
+    const list = document.getElementById(`${field}Attachments`);
+    if (!list) continue;
+    list.replaceChildren();
+    (draftAttachments[field] || []).forEach((attachment, index) => {
+      const row = document.createElement("div");
+      row.className = "attachment-row";
+      const preview = document.createElement("img");
+      preview.src = attachment.dataUrl;
+      preview.alt = attachment.name;
+      const name = document.createElement("span");
+      name.textContent = attachment.name;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "ghost small";
+      remove.textContent = "Quitar";
+      remove.setAttribute("aria-label", `Quitar ${attachment.name}`);
+      remove.addEventListener("click", async () => {
+        draftAttachments[field].splice(index, 1);
+        renderAttachments();
+        await saveDraft();
+      });
+      row.append(preview, name, remove);
+      list.append(row);
+    });
+  }
+}

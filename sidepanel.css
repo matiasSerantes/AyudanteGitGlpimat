@@ -162,3 +162,15 @@ dialog > form > p:not(.eyebrow) { color: #536d79; line-height: 1.45; }
   .grid.two { grid-template-columns: 1fr; gap: 0; }
   .check-field { margin-top: 0; margin-bottom: 13px; }
 }
+
+.attachment-button { margin-left: 6px; }
+.attachment-list { display: grid; gap: 6px; }
+.attachment-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.attachment-row img { width: 44px; height: 44px; object-fit: contain; border-radius: 4px; }
+.attachment-row span { flex: 1; overflow-wrap: anywhere; font-size: 12px; }
+
+.attachment-hint { color: #667085; font-size: 12px; }
+
+.optional-field { margin-bottom: 13px; }
+.optional-field summary { cursor: pointer; color: #087e87; font-size: 12px; font-weight: 750; padding: 8px 0; }
+.optional-field[open] summary { margin-bottom: 6px; }
