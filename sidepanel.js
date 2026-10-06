@@ -1,4 +1,4 @@
-const CENTRAL_URL = "https://central.smartsouth.net/central/";
+const CENTRAL_URL = "https://operaciones.smartsouth.net/central/";
 const STORAGE_KEY = "smartCentralTicketQueue";
 const DRAFT_KEY = "smartCentralTicketDraft";
 const TEMPLATES_KEY = "smartCentralTicketTemplates";
@@ -199,7 +199,7 @@ async function refreshCatalogsFromCentral() {
   if (refreshCatalogsFromCentral.running) return;
   refreshCatalogsFromCentral.running = true;
   try {
-    const tabs = await chrome.tabs.query({ url: "https://central.smartsouth.net/*" });
+    const tabs = await chrome.tabs.query({ url: ["https://operaciones.smartsouth.net/*", "https://central.smartsouth.net/*"] });
     const tab = tabs.find((candidate) => candidate.active) || tabs[0];
     if (!tab) return;
     const result = await sendToTab(tab.id, { type: "central.catalogs" });
@@ -592,7 +592,7 @@ function setRunningUi(running) {
 }
 
 async function ensureCentralTab() {
-  const tabs = await chrome.tabs.query({ url: "https://central.smartsouth.net/*" });
+  const tabs = await chrome.tabs.query({ url: ["https://operaciones.smartsouth.net/*", "https://central.smartsouth.net/*"] });
   let tab = tabs.find((candidate) => candidate.active) || tabs[0];
   if (!tab) tab = await chrome.tabs.create({ url: CENTRAL_URL, active: true });
   else await chrome.tabs.update(tab.id, { active: true });
@@ -608,7 +608,7 @@ async function openCentral() {
 
 async function checkConnection() {
   try {
-    const tabs = await chrome.tabs.query({ url: "https://central.smartsouth.net/*" });
+    const tabs = await chrome.tabs.query({ url: ["https://operaciones.smartsouth.net/*", "https://central.smartsouth.net/*"] });
     if (!tabs.length) return showDisconnected("Central no esta abierto");
     const probe = await sendToTab(tabs[0].id, { type: "central.probe" });
     if (probe?.ready) showConnected();

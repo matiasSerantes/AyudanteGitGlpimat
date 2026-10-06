@@ -1,6 +1,6 @@
 # Cola de tickets Smart Central
 
-Extension local de Chrome que permite preparar varios tickets y crearlos uno por uno usando la sesion ya iniciada en `central.smartsouth.net`.
+Extension local de Chrome que permite preparar varios tickets y crearlos uno por uno usando la sesion ya iniciada en `operaciones.smartsouth.net/central/` (URL temporal por mantenimiento). Tambien admite `central.smartsouth.net` para cuando se restablezca el servicio.
 
 ## Instalacion
 
