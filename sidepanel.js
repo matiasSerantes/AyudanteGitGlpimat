@@ -66,6 +66,7 @@ function bindEvents() {
 async function restoreState() {
   const data = await chrome.storage.local.get([STORAGE_KEY, DRAFT_KEY]);
   state.queue = Array.isArray(data[STORAGE_KEY]) ? data[STORAGE_KEY] : [];
+  state.queue = state.queue.map(migrateDescriptionImages);
   state.queue = state.queue.map((item) => item.status === "processing" ? { ...item, status: "pending" } : item);
   if (data[DRAFT_KEY]) applyTicketToForm(data[DRAFT_KEY]);
   else applyTicketToForm({
@@ -79,6 +80,14 @@ async function restoreState() {
   if (!form.elements.attentionDate.value) form.elements.attentionDate.value = currentLocalDateTime();
   toggleAttentionDate();
   toggleCompletionFields();
+}
+
+function migrateDescriptionImages(ticket) {
+  if (!ticket.attachments?.description?.length) return ticket;
+  const attachments = structuredClone(ticket.attachments);
+  attachments.workDetail = [...(attachments.workDetail || []), ...attachments.description];
+  delete attachments.description;
+  return { ...ticket, attachments };
 }
 
 function readForm() {
@@ -104,6 +113,7 @@ function readForm() {
 }
 
 function applyTicketToForm(ticket) {
+  ticket = migrateDescriptionImages(ticket);
   draftAttachments = structuredClone(ticket.attachments || {});
   renderAttachments();
   for (const field of ["workDetail", "internalNote"]) form.elements[field].value = ticket[field] || "";
@@ -541,6 +551,9 @@ async function runQueue() {
         : `Creando: ${item.title}`;
 
       try {
+        if (!item.closeAfterCreate && Object.values(item.attachments || {}).some((images) => images.length)) {
+          throw new Error("Las imagenes se adjuntan despues de crear. Edita el ticket y activa Registrar trabajo y cerrar ticket para enviarlas.");
+        }
         const result = item.ticketReference
           ? { ok: true, reference: item.ticketReference, recovered: true }
           : await sendToTab(tab.id, { type: "central.create", ticket: item });
@@ -744,7 +757,7 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
 let draftAttachments = {};
-const IMAGE_FIELDS = ["description", "workDetail", "internalNote", "customerMessage"];
+const IMAGE_FIELDS = ["workDetail", "internalNote", "customerMessage"];
 let readingImages = false;
 
 function setupImageAttachments() {

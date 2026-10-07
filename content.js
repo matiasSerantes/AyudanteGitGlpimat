@@ -91,7 +91,6 @@ async function createTicket(ticket) {
   await setSelect("tipo", ticket.ticketType);
   await setSelect("categoria glpi", ticket.category);
   await setSelect("prioridad", ticket.priority);
-  await attachFieldImages(findControl("descripcion", "textarea"), ticket.attachments?.description, "Descripcion");
 
   const submit = findButton(["crear ticket"]);
   if (!submit) throw new Error("No se encontro el boton Crear ticket.");
