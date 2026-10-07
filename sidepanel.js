@@ -450,7 +450,7 @@ function renderQueue() {
     row.querySelector("strong").textContent = item.title;
     const imageCount = Object.values(item.attachments || {}).reduce((total, images) => total + images.length, 0);
     const workflow = (item.closeAfterCreate ? " | Crear y cerrar" : "") + (imageCount ? ` | ${imageCount} imagen(es)` : "");
-    row.querySelector(".ticket-main span").textContent = `${item.entity} | ${status}${workflow}`;
+    row.querySelector(".ticket-main span").textContent = `${item.entity} | ${status}${workflow}${item.warnings?.length ? " | Aviso: alguna imagen no se pudo confirmar" : ""}`;
     list.appendChild(row);
   }
 
@@ -567,6 +567,7 @@ async function runQueue() {
         if (item.closeAfterCreate) {
           $("#runStatus").textContent = `Registrando trabajo y cerrando ${item.ticketReference || "el ticket"}...`;
           const finalizeResult = await sendToTab(tab.id, { type: "central.finalize", ticket: item });
+          item.warnings = finalizeResult?.warnings || [];
           if (!finalizeResult?.ok) {
             throw new Error(finalizeResult?.error || "No se pudo registrar el trabajo y cerrar el ticket.");
           }

@@ -122,6 +122,7 @@ function startReturnToTicketList() {
 }
 
 async function finalizeTicket(ticket) {
+  const warnings = [];
   await openTicketDetail(ticket);
   await setSelect("tiempo facturable", ticket.billableTime);
   setCustomerMessage(ticket.customerMessage);
@@ -129,9 +130,17 @@ async function finalizeTicket(ticket) {
     const images = ticket.attachments?.[field] || [];
     if (!ticket[field] && !images.length) continue;
     const control = findControl(label, "textarea");
-    if (!control) throw new Error(`No se encontro el campo ${label}.`);
+    if (!control) {
+      if (ticket[field]) throw new Error(`No se encontro el campo ${label}.`);
+      warnings.push(`Imagen opcional: no se encontro el campo ${label}.`);
+      continue;
+    }
     if (field !== "customerMessage") setNativeValue(control, ticket[field] || "");
-    await attachFieldImages(control, images, label);
+    try {
+      await attachFieldImages(control, images, label);
+    } catch (error) {
+      warnings.push(`Imagen opcional: ${error.message}`);
+    }
   }
 
   const closeButton = findOperationalCloseButton();
@@ -140,7 +149,7 @@ async function finalizeTicket(ticket) {
   closeButton.click();
 
   await waitForTicketClosure(ticket.ticketReference);
-  return { ok: true, reference: ticket.ticketReference };
+  return { ok: true, reference: ticket.ticketReference, warnings };
 }
 
 async function openTicketDetail(ticket) {
@@ -486,12 +495,33 @@ async function attachFieldImages(control, images, label) {
     const transfer = new DataTransfer();
     transfer.items.add(new File([bytes], attachment.name, { type: match[1] }));
     const previousValue = control.value;
+    const previousImages = readImportedImageSources(container);
+    const currentControl = () => findControl(label, "textarea") || control;
     picker.value = "";
     picker.files = transfer.files;
     picker.dispatchEvent(new Event("change", { bubbles: true }));
     // Central's image importer inserts the image into the associated text.
     // Do not submit while an import is still pending or unconfirmed.
-    await waitUntil(() => control.value !== previousValue, CONTROL_TIMEOUT,
+    await waitUntil(() => currentControl().value !== previousValue
+      || [...readImportedImageSources(container.isConnected === false ? findImageFieldContainer(currentControl()) : container)]
+        .some((source) => !previousImages.has(source)), 30000,
       `Central no confirmo la imagen ${attachment.name} en ${label}. Revisa el ticket antes de reintentar.`);
   }
+}
+
+function readImportedImageSources(container) {
+  return new Set([...container.querySelectorAll("img[src], a[href]")]
+    .map((node) => node.getAttribute(node.tagName === "IMG" ? "src" : "href"))
+    .filter((source) => source && (/^(data:image\/|blob:)/i.test(source)
+      || /\.(png|jpe?g|gif|webp)(?:[?#]|$)/i.test(source))));
+}
+
+function findImageFieldContainer(control) {
+  let container = control.parentElement;
+  while (container && container !== document.body) {
+    if (container.querySelectorAll("textarea").length > 1) break;
+    if (container.querySelectorAll('input[type="file"]').length === 1) return container;
+    container = container.parentElement;
+  }
+  return control.parentElement;
 }
