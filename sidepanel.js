@@ -428,7 +428,7 @@ function renderQueue() {
     row.dataset.id = item.id;
     const completedLabel = item.closeAfterCreate ? "Cerrado" : "Enviado";
     const sentStatus = item.ticketReference ? `${completedLabel} ${item.ticketReference}` : completedLabel;
-    const status = ({ pending: "Pendiente", processing: "Enviando", done: sentStatus, error: `Error: ${item.error || "sin detalle"}` })[item.status] || item.status;
+    const status = ({ pending: "Pendiente", processing: "Enviando", done: sentStatus, error: `${item.ticketReference ? `Creado ${item.ticketReference}; pendiente de completar. ` : ""}Error: ${item.error || "sin detalle"}` })[item.status] || item.status;
     row.innerHTML = `
       <span class="status-dot" aria-hidden="true"></span>
       <div class="ticket-main"><strong></strong><span></span></div>
@@ -464,7 +464,7 @@ async function handleQueueAction(event) {
     state.queue = state.queue.filter((ticket) => ticket.id !== item.id);
   } else if (button.dataset.action === "duplicate") {
     const index = state.queue.findIndex((ticket) => ticket.id === item.id);
-    state.queue.splice(index + 1, 0, { ...item, id: crypto.randomUUID(), status: "pending", error: "", createdAt: Date.now() });
+    state.queue.splice(index + 1, 0, { ...item, id: crypto.randomUUID(), ticketReference: "", status: "pending", error: "", createdAt: Date.now() });
   } else if (button.dataset.action === "edit") {
     applyTicketToForm(item);
     state.editingId = item.id;
@@ -536,7 +536,9 @@ async function runQueue() {
       item.error = "";
       await persistQueue();
       renderQueue();
-      $("#runStatus").textContent = `Creando: ${item.title}`;
+      $("#runStatus").textContent = item.ticketReference
+        ? `Continuando ${item.ticketReference}: ${item.title}`
+        : `Creando: ${item.title}`;
 
       try {
         const result = item.ticketReference

@@ -173,11 +173,7 @@ function findActionByReference(reference) {
 }
 
 function setCustomerMessage(value) {
-  const control = findControl("mensaje al cliente / solucion", "textarea")
-    || [...document.querySelectorAll("textarea")].find((textarea) => {
-      const placeholder = normalize(textarea.placeholder);
-      return placeholder.includes("resultado o respuesta para el cliente");
-    });
+  const control = findControl("mensaje al cliente / solucion", "textarea");
   if (!control) throw new Error("No se encontro el campo Mensaje al cliente / solucion.");
   setNativeValue(control, value);
 }
@@ -249,10 +245,26 @@ function findControl(labelText, preferredTag) {
     if (nearby) return nearby;
   }
 
+  // Central also renders field captions as headings with an attachment button.
+  // Walk only within a container containing one matching control.
+  const selector = preferredTag || "input, textarea, select, [role=combobox]";
+  const captions = [...document.querySelectorAll("label, h1, h2, h3, h4, h5, h6, span, p, div")]
+    .filter((node) => isVisible(node) && normalize(node.textContent) === target);
+  for (const caption of captions) {
+    let container = caption;
+    while (container && container !== document.body) {
+      const controls = [...container.querySelectorAll(selector)].filter(isVisible);
+      if (controls.length > 1) break;
+      if (controls.length === 1) return controls[0];
+      container = container.parentElement;
+    }
+  }
+
   const candidates = [...document.querySelectorAll(preferredTag || "input, textarea, select, [role=combobox]")];
   return candidates.find((control) => {
     const haystack = [control.name, control.id, control.placeholder, control.getAttribute("aria-label")].filter(Boolean).map(normalize).join(" ");
-    return haystack.includes(target);
+    return isVisible(control) && (haystack.includes(target)
+      || (target === "mensaje al cliente / solucion" && normalize(control.placeholder).includes("resultado o respuesta para el cliente")));
   }) || null;
 }
 

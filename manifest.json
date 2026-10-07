@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cola de tickets Smart Central",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Carga tickets en cola usando la sesion abierta de Smart Central.",
   "permissions": ["storage", "unlimitedStorage", "tabs", "sidePanel", "scripting"],
   "host_permissions": [
