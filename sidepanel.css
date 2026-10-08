@@ -174,3 +174,5 @@ dialog > form > p:not(.eyebrow) { color: #536d79; line-height: 1.45; }
 .optional-field { margin-bottom: 13px; }
 .optional-field summary { cursor: pointer; color: #087e87; font-size: 12px; font-weight: 750; padding: 8px 0; }
 .optional-field[open] summary { margin-bottom: 6px; }
+
+.optional-clear-actions { margin: 0 0 13px; }

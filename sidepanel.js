@@ -55,6 +55,7 @@ function bindEvents() {
   $("#entity").addEventListener("focus", refreshCatalogsFromCentral);
   $("#technician").addEventListener("focus", refreshCatalogsFromCentral);
   $("#clearFormButton").addEventListener("click", resetForm);
+  $("#clearOptionalFieldsButton").addEventListener("click", clearOptionalFields);
   $("#clearCompletedButton").addEventListener("click", clearCompleted);
   $("#startButton").addEventListener("click", confirmRun);
   $("#pauseButton").addEventListener("click", requestPause);
@@ -730,6 +731,20 @@ function toggleCompletionFields() {
   $("#completionFields").classList.toggle("hidden", !enabled);
   form.elements.customerMessage.required = enabled;
   form.elements.billableTime.required = enabled;
+}
+
+async function clearOptionalFields() {
+  if (readingImages) {
+    showToast("Espera a que termine de cargar la imagen y volve a limpiar.", true);
+    return;
+  }
+  for (const field of ["workDetail", "internalNote"]) {
+    form.elements[field].value = "";
+    delete draftAttachments[field];
+  }
+  renderAttachments();
+  await saveDraft();
+  showToast("Detalle y nota interna limpiados, incluidas sus imagenes.");
 }
 
 async function resetForm() {

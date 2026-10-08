@@ -124,6 +124,13 @@ function startReturnToTicketList() {
 async function finalizeTicket(ticket) {
   const warnings = [];
   await openTicketDetail(ticket);
+  if (findButton(["reintentar guardado"])) {
+    throw new Error("Central tiene un guardado pendiente. Usa Reintentar guardado en Central antes de reanudar la cola.");
+  }
+  if (isTicketCompleted(ticket.ticketReference)) {
+    await returnAfterCompletion(ticket.ticketReference);
+    return { ok: true, reference: ticket.ticketReference, warnings };
+  }
   await setSelect("tiempo facturable", ticket.billableTime);
   setCustomerMessage(ticket.customerMessage);
   for (const [field, label] of [["workDetail", "detalle para el cliente / motivo"], ["internalNote", "nota interna"], ["customerMessage", "mensaje al cliente / solucion"]]) {
@@ -193,33 +200,45 @@ function findOperationalCloseButton() {
     .sort((left, right) => right.getBoundingClientRect().top - left.getBoundingClientRect().top)[0] || null;
 }
 
+function isTicketCompleted(reference) {
+  const detail = readTicketDetail();
+  if (!detail || (reference && detail.reference !== reference)) return false;
+  // Read the current header status, excluding history and editable work fields.
+  const header = document.body.innerText.split(/datos del ticket|historial y evidencias|trabajo y horas/i)[0];
+  return header.split(/\r?\n/).some((line) => ["cerrado", "resuelto"].includes(normalize(line)))
+    && !findButton(["reintentar guardado"]);
+}
+
+async function returnAfterCompletion(reference) {
+  const dismiss = findTicketCloseButton();
+  if (dismiss) dismiss.click();
+  await waitUntil(
+    () => Boolean(findButton(["nuevo ticket"])) && !readTicketDetail(),
+    POST_CLOSURE_RETURN_TIMEOUT,
+    `El ticket ${reference || ""} se completo, pero no se pudo volver a la lista.`
+  );
+}
+
 async function waitForTicketClosure(reference) {
   const started = Date.now();
   while (Date.now() - started < TICKET_CLOSURE_TIMEOUT) {
     const detail = readTicketDetail();
     if (!detail && findButton(["nuevo ticket"])) return;
 
-    const visibleText = document.body.innerText;
-    const closedState = visibleText.split(/\r?\n/).some((line) => normalize(line) === "cerrado")
-      || Boolean(findButton(["reabrir"]))
-      || normalize(visibleText).includes("ticket cerrado");
-    if (closedState) {
-      const dismiss = findTicketCloseButton();
-      if (dismiss) dismiss.click();
-      await waitUntil(
-        () => Boolean(findButton(["nuevo ticket"])) && !readTicketDetail(),
-        POST_CLOSURE_RETURN_TIMEOUT,
-        `El ticket ${reference || ""} se cerro, pero no se pudo volver a la lista.`
-      );
+    if (isTicketCompleted(reference)) {
+      await returnAfterCompletion(reference);
       return;
     }
 
+    if (findButton(["reintentar guardado"])) {
+      throw new Error("Central no confirmo el guardado. Usa Reintentar guardado en Central antes de reanudar la cola.");
+    }
     const error = [...document.querySelectorAll('[role="alert"], .alert-danger, .error, .toast')]
       .find((node) => /error|obligatorio|invalido|no se pudo/.test(normalize(node.textContent)));
     if (error) throw new Error(error.textContent.trim().slice(0, 240));
     await delay(350);
   }
-  throw new Error(`No hubo confirmacion de cierre para el ticket ${reference || ""}. Revisalo antes de reintentar.`);
+  throw new Error(`No hubo confirmacion de estado Resuelto o Cerrado para el ticket ${reference || ""}. Revisalo antes de reintentar.`);
 }
 
 async function openTicketForm() {
@@ -257,7 +276,8 @@ function findControl(labelText, preferredTag) {
   // Walk only within a container containing one matching control.
   const selector = preferredTag || "input, textarea, select, [role=combobox]";
   const captions = [...document.querySelectorAll("label, h1, h2, h3, h4, h5, h6, span, p, div")]
-    .filter((node) => isVisible(node) && normalize(node.textContent) === target);
+    .filter((node) => isVisible(node)
+      && normalize(node.textContent).replace(/\s*\(opcional\)$/, "").trim() === target);
   for (const caption of captions) {
     let container = caption;
     while (container && container !== document.body) {
