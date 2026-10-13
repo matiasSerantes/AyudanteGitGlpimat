@@ -23,6 +23,7 @@ const form = $("#ticketForm");
 const toast = $("#toast");
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await centralLog("info", "panel.open");
   setupImageAttachments();
   bindEvents();
   await loadCatalogs();
@@ -32,7 +33,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   await checkConnection();
 });
 
+async function exportDiagnosticLog() {
+  try {
+    await centralLog("info", "log.export");
+    const stored = await chrome.storage.local.get("smartCentralDiagnostics");
+    const report = { exportedAt: new Date().toISOString(), version: chrome.runtime.getManifest().version,
+      browser: navigator.userAgent, entries: stored.smartCentralDiagnostics || [] };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `central-log-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast("Log descargado. Compartilo para revisar el fallo.");
+  } catch (error) { showToast(`No se pudo descargar el log: ${error.message}`, true); }
+}
+
 function bindEvents() {
+  $("#exportLogButton").addEventListener("click", exportDiagnosticLog);
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
   });
@@ -527,6 +545,7 @@ function handleConfirmation() {
 
 async function runQueue() {
   if (state.running) return;
+  await centralLog("info", "queue.start", { pending: state.queue.filter(item => ["pending", "error"].includes(item.status)).length });
   state.running = true;
   state.stopRequested = false;
   setRunningUi(true);
@@ -581,12 +600,14 @@ async function runQueue() {
           await waitForTicketList(tab.id);
         }
 
+        await centralLog("info", "ticket.done", { id: item.id, reference: item.ticketReference, warnings: item.warnings });
         item.status = "done";
         item.error = "";
         await persistQueue();
         renderQueue();
         await delay(700);
       } catch (error) {
+        await centralLog("error", "ticket.failed", { id: item.id, reference: item.ticketReference, message: error.message, stack: error.stack });
         item.status = "error";
         item.error = error.message || "La pagina no completo el ticket.";
         await persistQueue();
@@ -595,8 +616,10 @@ async function runQueue() {
       }
     }
   } catch (error) {
+    await centralLog("error", "queue.stopped", { message: error.message });
     showToast(error.message || "La cola se detuvo.", true);
   } finally {
+    await centralLog("info", "queue.end", { paused: state.stopRequested });
     state.running = false;
     setRunningUi(false);
     const remains = state.queue.some((item) => item.status === "pending" || item.status === "error");
@@ -666,12 +689,20 @@ function showLoginState(reason) {
 
 async function sendToTab(tabId, message) {
   try {
-    return await chrome.tabs.sendMessage(tabId, message);
+    await centralLog("info", "page.request", { tabId, operation: message.type, id: message.ticket?.id });
+    const result = await chrome.tabs.sendMessage(tabId, message);
+    await centralLog(result?.ok === false ? "warn" : "info", "page.response", { tabId, operation: message.type, ok: result?.ok, ready: result?.ready, error: result?.error });
+    return result;
   } catch (error) {
+    await centralLog("warn", "page.connection.retry", { tabId, operation: message.type, message: error.message });
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-      return await chrome.tabs.sendMessage(tabId, message);
-    } catch (_) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["diagnostics.js", "content.js"] });
+      await centralLog("info", "page.request", { tabId, operation: message.type, id: message.ticket?.id });
+    const result = await chrome.tabs.sendMessage(tabId, message);
+    await centralLog(result?.ok === false ? "warn" : "info", "page.response", { tabId, operation: message.type, ok: result?.ok, ready: result?.ready, error: result?.error });
+    return result;
+    } catch (retryError) {
+      await centralLog("error", "page.connection.failed", { message: retryError.message });
       throw new Error("No se pudo conectar con la pagina. Recargala y vuelve a intentar.");
     }
   }

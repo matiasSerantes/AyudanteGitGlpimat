@@ -1,3 +1,5 @@
+if (!globalThis.centralContentLoaded) {
+globalThis.centralContentLoaded = true;
 const CONTROL_TIMEOUT = 12000;
 const TICKET_CLOSURE_TIMEOUT = 45000;
 const POST_CLOSURE_RETURN_TIMEOUT = 20000;
@@ -8,14 +10,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
   if (message.type === "central.create") {
-    createTicket(message.ticket).then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+    createTicket(message.ticket).then(sendResponse).catch(async (error) => {
+      await centralLog("error", "operation.failed", { operation: message.type, message: error.message,
+        stack: error.stack, loginPage: isLoginPage(), formOpen: isTicketFormOpen(), readyState: document.readyState });
+      sendResponse({ ok: false, error: error.message });
+    });
     return true;
   }
   if (message.type === "central.return") {
     sendResponse(startReturnToTicketList());
   }
   if (message.type === "central.finalize") {
-    finalizeTicket(message.ticket).then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+    finalizeTicket(message.ticket).then(sendResponse).catch(async (error) => {
+      await centralLog("error", "operation.failed", { operation: message.type, message: error.message,
+        stack: error.stack, loginPage: isLoginPage(), formOpen: isTicketFormOpen(), readyState: document.readyState });
+      sendResponse({ ok: false, error: error.message });
+    });
     return true;
   }
   if (message.type === "central.listReady") {
@@ -69,6 +79,7 @@ function readControlOptions(control) {
 }
 
 async function createTicket(ticket) {
+  await centralLog("info", "create.start", { id: ticket.id, loginPage: isLoginPage(), formOpen: isTicketFormOpen() });
   if (isLoginPage()) throw new Error("La sesion se cerro. Inicia sesion y reintenta.");
 
   const existingSuccess = readTicketSuccess(ticket.title);
@@ -79,6 +90,7 @@ async function createTicket(ticket) {
     return { ok: true, reference: existingSuccess.reference, recovered: true };
   }
 
+  await centralLog("info", "create.openForm");
   await openTicketForm();
 
   await setSelect("entidad / cliente", ticket.entity);
@@ -96,6 +108,7 @@ async function createTicket(ticket) {
   if (!submit) throw new Error("No se encontro el boton Crear ticket.");
   if (submit.disabled) throw new Error("El formulario no habilito Crear ticket. Revisa los valores elegidos.");
 
+  await centralLog("info", "create.submit");
   submit.click();
   const result = await waitForSubmission(ticket.title);
   if (!result.ok) throw new Error(result.error);
@@ -122,6 +135,7 @@ function startReturnToTicketList() {
 }
 
 async function finalizeTicket(ticket) {
+  await centralLog("info", "finalize.start", { id: ticket.id, reference: ticket.ticketReference });
   const warnings = [];
   await openTicketDetail(ticket);
   if (findButton(["reintentar guardado"])) {
@@ -153,6 +167,7 @@ async function finalizeTicket(ticket) {
   const closeButton = findOperationalCloseButton();
   if (!closeButton) throw new Error("No se encontro el boton operativo Cerrar del ticket.");
   if (closeButton.disabled) throw new Error("El boton Cerrar no se habilito despues de completar el trabajo.");
+  await centralLog("info", "finalize.close");
   closeButton.click();
 
   await waitForTicketClosure(ticket.ticketReference);
@@ -297,12 +312,14 @@ function findControl(labelText, preferredTag) {
 }
 
 function setText(label, value, tag) {
+  centralLog("info", "field.text", { field: label });
   const control = findControl(label, tag);
   if (!control) throw new Error(`No se encontro el campo ${label}.`);
   setNativeValue(control, value);
 }
 
 async function setSelect(label, visibleValue) {
+  await centralLog("info", "field.select", { field: label });
   const wanted = normalize(visibleValue);
   const started = Date.now();
   let customControl = null;
@@ -544,4 +561,6 @@ function findImageFieldContainer(control) {
     container = container.parentElement;
   }
   return control.parentElement;
+}
+
 }

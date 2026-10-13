@@ -192,6 +192,10 @@
         <button id="clearCompletedButton" class="ghost small">Limpiar enviados</button>
       </div>
 
+      <div class="queue-toolbar">
+        <div><strong>Diagnostico</strong><p>Log local automatico (ultimos 1500 eventos).</p></div>
+        <button id="exportLogButton" class="ghost small">Descargar log</button>
+      </div>
       <ol id="queueList" class="queue-list"></ol>
       <div id="emptyQueue" class="empty-state">
         <strong>No hay tickets en cola</strong>
@@ -219,6 +223,7 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="diagnostics.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

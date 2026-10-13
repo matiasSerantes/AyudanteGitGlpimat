@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cola de tickets Smart Central",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Carga tickets en cola usando la sesion abierta de Smart Central.",
   "permissions": [
     "storage",
@@ -31,6 +31,7 @@
         "https://central.smartsouth.net/*"
       ],
       "js": [
+        "diagnostics.js",
         "content.js"
       ],
       "run_at": "document_idle"
