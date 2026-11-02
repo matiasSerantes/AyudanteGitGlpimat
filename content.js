@@ -1,6 +1,7 @@
 if (!globalThis.centralContentLoaded) {
 globalThis.centralContentLoaded = true;
 const CONTROL_TIMEOUT = 12000;
+const WORK_SAVE_TIMEOUT = 45000;
 const TICKET_CLOSURE_TIMEOUT = 45000;
 const POST_CLOSURE_RETURN_TIMEOUT = 20000;
 
@@ -32,7 +33,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ready: Boolean(findButton(["nuevo ticket"])) && !isTicketFormOpen() && !readTicketSuccess() });
   }
   if (message.type === "central.catalogs") {
-    sendResponse(readCatalogsFromOpenForm());
+    collectCatalogs(message.openForm).then(sendResponse).catch(error => {
+      sendResponse({ ok: false, error: error.message });
+    });
+    return true;
   }
 });
 
@@ -42,6 +46,25 @@ function probePage() {
   if (canOpen || formOpen) return { ready: true };
   if (isLoginPage()) return { ready: false, reason: "Inicia sesion en Central para continuar." };
   return { ready: false, reason: "Abre la seccion Mesa de ayuda y activos para continuar." };
+}
+
+async function collectCatalogs(openForm = false) {
+  if (isLoginPage()) throw new Error("Inicia sesion en Central para actualizar las entidades.");
+  if (openForm && !isTicketFormOpen()) await openTicketForm();
+  if (!isTicketFormOpen()) {
+    return { ok: false, error: "Abre Nuevo ticket en Central o pulsa Actualizar desde Central." };
+  }
+  let previous = "";
+  let stableSince = Date.now();
+  const started = Date.now();
+  while (Date.now() - started < CONTROL_TIMEOUT) {
+    const result = readCatalogsFromOpenForm();
+    const signature = JSON.stringify(result.catalogs);
+    if (signature !== previous) { previous = signature; stableSince = Date.now(); }
+    if (result.catalogs.entities.length && Date.now() - stableSince >= 800) return result;
+    await delay(200);
+  }
+  throw new Error("Central no mostro las entidades. Revisa que el selector Entidad / cliente tenga opciones y vuelve a actualizar.");
 }
 
 function readCatalogsFromOpenForm() {
@@ -72,10 +95,7 @@ function readControlOptions(control) {
       .filter(Boolean);
   }
 
-  return [...document.querySelectorAll('[role="option"], option, li')]
-    .filter(isVisible)
-    .map((option) => (option.textContent || option.value || "").trim())
-    .filter(Boolean);
+  return [];
 }
 
 async function createTicket(ticket) {
@@ -164,9 +184,7 @@ async function finalizeTicket(ticket) {
     }
   }
 
-  const closeButton = findOperationalCloseButton();
-  if (!closeButton) throw new Error("No se encontro el boton operativo Cerrar del ticket.");
-  if (closeButton.disabled) throw new Error("El boton Cerrar no se habilito despues de completar el trabajo.");
+  const closeButton = await waitForOperationalCloseButton();
   await centralLog("info", "finalize.close");
   closeButton.click();
 
@@ -213,6 +231,26 @@ function findOperationalCloseButton() {
     .filter(isVisible)
     .filter((button) => normalize(button.textContent || button.value) === "cerrar")
     .sort((left, right) => right.getBoundingClientRect().top - left.getBoundingClientRect().top)[0] || null;
+}
+
+async function waitForOperationalCloseButton() {
+  const started = Date.now();
+  await centralLog("info", "finalize.waitForWorkSave");
+  while (Date.now() - started < WORK_SAVE_TIMEOUT) {
+    if (isLoginPage()) throw new Error("La sesion se cerro. Inicia sesion y reintenta.");
+    if (findButton(["reintentar guardado"])) {
+      throw new Error("Central no confirmo el guardado del trabajo. Usa Reintentar guardado en Central antes de reanudar la cola.");
+    }
+    // Central may replace the footer while saving; read the current button each time.
+    const button = findOperationalCloseButton();
+    if (button && !button.disabled && button.getAttribute("aria-disabled") !== "true") {
+      await centralLog("info", "finalize.workSaveReady", { elapsedMs: Date.now() - started });
+      return button;
+    }
+    await delay(200);
+  }
+  await centralLog("warn", "finalize.workSaveTimeout", { elapsedMs: Date.now() - started });
+  throw new Error("Central no habilito Cerrar en 45 segundos despues de completar el trabajo. Revisa el guardado y los campos obligatorios antes de reanudar la cola.");
 }
 
 function isTicketCompleted(reference) {

@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadTemplates();
   renderQueue();
   await checkConnection();
+  await refreshCatalogsFromCentral();
 });
 
 async function exportDiagnosticLog() {
@@ -70,6 +71,7 @@ function bindEvents() {
     updateTemplateActions();
     if ($("#templateSelect").value) applySelectedTemplate();
   });
+  $("#refreshCatalogsButton").addEventListener("click", () => refreshCatalogsFromCentral(true));
   $("#entity").addEventListener("focus", refreshCatalogsFromCentral);
   $("#technician").addEventListener("focus", refreshCatalogsFromCentral);
   $("#clearFormButton").addEventListener("click", resetForm);
@@ -231,15 +233,26 @@ function uniqueSorted(values) {
     .sort((left, right) => left.localeCompare(right, "es"));
 }
 
-async function refreshCatalogsFromCentral() {
+async function refreshCatalogsFromCentral(manual = false) {
+  manual = manual === true;
+  if (state.running) {
+    if (manual) showToast("Pausa la cola antes de actualizar las entidades.", true);
+    return;
+  }
   if (refreshCatalogsFromCentral.running) return;
   refreshCatalogsFromCentral.running = true;
   try {
     const tabs = await chrome.tabs.query({ url: ["https://operaciones.smartsouth.net/*", "https://central.smartsouth.net/*"] });
     const tab = tabs.find((candidate) => candidate.active) || tabs[0];
-    if (!tab) return;
-    const result = await sendToTab(tab.id, { type: "central.catalogs" });
-    if (!result?.ok) return;
+    if (!tab) {
+      if (manual) showToast("Abre Central e inicia sesion para actualizar las entidades.", true);
+      return;
+    }
+    const result = await sendToTab(tab.id, { type: "central.catalogs", openForm: manual });
+    if (!result?.ok) {
+      if (manual) showToast(result?.error || "No se pudieron leer las entidades de Central.", true);
+      return;
+    }
     const nextCatalogs = mergeCatalogs(state.catalogs, result.catalogs || {});
     if (
       nextCatalogs.entities.length !== state.catalogs.entities.length
@@ -251,6 +264,11 @@ async function refreshCatalogsFromCentral() {
       applyTicketToForm(current);
       await persistCatalogs();
     }
+    await centralLog("info", "catalogs.refreshed", { entities: result.catalogs.entities.length, technicians: result.catalogs.technicians.length });
+    if (manual) showToast(`Central: ${result.catalogs.entities.length} entidades leidas.`);
+  } catch (error) {
+    await centralLog("warn", "catalogs.failed", { message: error.message });
+    if (manual) showToast(`No se pudo actualizar: ${error.message}`, true);
   } finally {
     refreshCatalogsFromCentral.running = false;
   }
@@ -271,6 +289,7 @@ async function addTicket(event) {
     return;
   }
 
+  const isNewTicket = !state.editingId;
   if (state.editingId) {
     const index = state.queue.findIndex((item) => item.id === state.editingId);
     if (index >= 0) state.queue[index] = { ...state.queue[index], ...ticket, status: "pending", error: "" };
@@ -283,7 +302,22 @@ async function addTicket(event) {
   }
 
   await persistQueue();
+  if (isNewTicket && ticket.pastAttention) {
+    advanceAttentionDate(ticket);
+    await saveDraft();
+  }
   renderQueue();
+}
+
+function advanceAttentionDate(ticket) {
+  const match = ticket.billableTime.match(/^(\d+(?:[,.]\d+)?)\s*h$/i);
+  if (!match || !ticket.attentionDate) return;
+  const minutes = Math.round(Number(match[1].replace(",", ".")) * 60);
+  // Treat the input as a wall-clock date, without timezone or DST conversions.
+  const nextDate = new Date(`${ticket.attentionDate}Z`);
+  if (!Number.isFinite(nextDate.getTime()) || minutes <= 0) return;
+  nextDate.setUTCMinutes(nextDate.getUTCMinutes() + minutes);
+  form.elements.attentionDate.value = nextDate.toISOString().slice(0, 16);
 }
 
 async function saveDraft() {
