@@ -65,3 +65,7 @@ Registra version, fecha UTC, navegador al exportar, etapas, campos procesados, e
 ## Entidades (0.3.16)
 
 El cargador lee las entidades disponibles en el formulario de Central; no consulta directamente la API de GLPI. Pulsa Actualizar desde Central con la sesion iniciada y la cola detenida: abre Nuevo ticket si hace falta, espera las opciones y muestra cuantas entidades leyo. Conserva las listas guardadas para trabajar sin conexion. Si una entidad tampoco aparece en el formulario de Central, se debe revisar su sincronizacion o permisos en Central/GLPI. Al abrir el panel tambien intenta leer un formulario que ya este abierto.
+
+## Confirmacion de operaciones (0.3.17)
+
+La creacion y el cierre ignoran alertas ocultas y mensajes que ya estaban visibles antes de enviar. Si Central muestra No se pudo confirmar la operacion, el cargador sigue esperando la confirmacion durante el plazo habitual (20 segundos al crear, 45 al cerrar), sin repetir el envio. Una confirmacion posterior permite continuar la cola; si no llega, la cola se pausa para revisar el estado antes de reintentar. Los errores nuevos de validacion siguen deteniendo la operacion.

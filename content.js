@@ -129,8 +129,9 @@ async function createTicket(ticket) {
   if (submit.disabled) throw new Error("El formulario no habilito Crear ticket. Revisa los valores elegidos.");
 
   await centralLog("info", "create.submit");
+  const previousErrors = new Set(readVisibleErrors());
   submit.click();
-  const result = await waitForSubmission(ticket.title);
+  const result = await waitForSubmission(ticket.title, previousErrors);
   if (!result.ok) throw new Error(result.error);
   return result;
 }
@@ -186,9 +187,10 @@ async function finalizeTicket(ticket) {
 
   const closeButton = await waitForOperationalCloseButton();
   await centralLog("info", "finalize.close");
+  const previousErrors = new Set(readVisibleErrors());
   closeButton.click();
 
-  await waitForTicketClosure(ticket.ticketReference);
+  await waitForTicketClosure(ticket.ticketReference, previousErrors);
   return { ok: true, reference: ticket.ticketReference, warnings };
 }
 
@@ -272,7 +274,7 @@ async function returnAfterCompletion(reference) {
   );
 }
 
-async function waitForTicketClosure(reference) {
+async function waitForTicketClosure(reference, previousErrors = new Set()) {
   const started = Date.now();
   while (Date.now() - started < TICKET_CLOSURE_TIMEOUT) {
     const detail = readTicketDetail();
@@ -286,9 +288,8 @@ async function waitForTicketClosure(reference) {
     if (findButton(["reintentar guardado"])) {
       throw new Error("Central no confirmo el guardado. Usa Reintentar guardado en Central antes de reanudar la cola.");
     }
-    const error = [...document.querySelectorAll('[role="alert"], .alert-danger, .error, .toast')]
-      .find((node) => /error|obligatorio|invalido|no se pudo/.test(normalize(node.textContent)));
-    if (error) throw new Error(error.textContent.trim().slice(0, 240));
+    const error = readOperationError(previousErrors);
+    if (error) throw new Error(error);
     await delay(350);
   }
   throw new Error(`No hubo confirmacion de estado Resuelto o Cerrado para el ticket ${reference || ""}. Revisalo antes de reintentar.`);
@@ -423,7 +424,21 @@ function dispatchInput(control) {
   control.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
-async function waitForSubmission(expectedTitle) {
+function readVisibleErrors() {
+  return [...document.querySelectorAll('[role="alert"], .alert-danger, .error, .toast')]
+    .filter(isVisible)
+    .map(node => node.textContent.trim())
+    .filter(text => /error|obligatorio|invalido|no se pudo/.test(normalize(text)));
+}
+
+function readOperationError(previousErrors) {
+  return readVisibleErrors().find(text => !previousErrors.has(text)
+    // An uncertain response can be followed by successful creation/closure.
+    // Keep observing the result; never submit the operation a second time.
+    && !normalize(text).includes("no se pudo confirmar la operacion"))?.slice(0, 240) || "";
+}
+
+async function waitForSubmission(expectedTitle, previousErrors = new Set()) {
   const started = Date.now();
   while (Date.now() - started < 20000) {
     const success = readTicketSuccess(expectedTitle);
@@ -431,9 +446,8 @@ async function waitForSubmission(expectedTitle) {
       return { ok: true, reference: success.reference };
     }
 
-    const error = [...document.querySelectorAll('[role="alert"], .alert-danger, .error, .toast')]
-      .find((node) => /error|obligatorio|invalido|no se pudo/.test(normalize(node.textContent)));
-    if (error) return { ok: false, error: error.textContent.trim().slice(0, 240) };
+    const error = readOperationError(previousErrors);
+    if (error) return { ok: false, error };
 
     const backButton = findButton(["volver"]);
     const viewButton = findButton(["ver ticket"]);
