@@ -13,7 +13,7 @@ function setup(alerts = [], successAt = Infinity) {
     delay: async ms => { now += ms; },
     readTicketSuccess: () => now >= successAt ? { titleMatches: true, reference: '#7003' } : null,
     findButton: () => null,
-    TICKET_CLOSURE_TIMEOUT: 45000,
+    TICKET_CLOSURE_TIMEOUT: 60000,
     readTicketDetail: () => now >= successAt ? null : {},
     isTicketCompleted: () => now >= successAt,
     returnAfterCompletion: async () => {}
@@ -44,4 +44,14 @@ test('uncertain creation without success times out safely', async () => {
 });
 test('closure also waits past an uncertain response', async () => {
   await vm.runInContext('waitForTicketClosure("#7003")', setup([{ visible: true, textContent: 'No se pudo confirmar la operación' }], 1400));
+});
+
+test('slow creation is confirmed after 55 seconds without resubmitting', async () => {
+  const result = await vm.runInContext('waitForSubmission("ticket lento")', setup([], 55000));
+  assert.equal(result.ok, true);
+  assert.equal(result.reference, '#7003');
+});
+
+test('slow closure can finish after 55 seconds', async () => {
+  await vm.runInContext('waitForTicketClosure("#7003")', setup([], 55000));
 });

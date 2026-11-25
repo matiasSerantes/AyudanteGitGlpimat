@@ -1,9 +1,9 @@
 if (!globalThis.centralContentLoaded) {
 globalThis.centralContentLoaded = true;
-const CONTROL_TIMEOUT = 12000;
-const WORK_SAVE_TIMEOUT = 45000;
-const TICKET_CLOSURE_TIMEOUT = 45000;
-const POST_CLOSURE_RETURN_TIMEOUT = 20000;
+const CONTROL_TIMEOUT = 60000;
+const WORK_SAVE_TIMEOUT = 60000;
+const TICKET_CLOSURE_TIMEOUT = 60000;
+const POST_CLOSURE_RETURN_TIMEOUT = 60000;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "central.probe") {
@@ -363,7 +363,7 @@ async function setSelect(label, visibleValue) {
   const started = Date.now();
   let customControl = null;
 
-  while (Date.now() - started < 8000) {
+  while (Date.now() - started < CONTROL_TIMEOUT) {
     const control = findControl(label);
     if (control?.tagName === "SELECT") {
       const options = [...control.options];
@@ -440,7 +440,7 @@ function readOperationError(previousErrors) {
 
 async function waitForSubmission(expectedTitle, previousErrors = new Set()) {
   const started = Date.now();
-  while (Date.now() - started < 20000) {
+  while (Date.now() - started < 60000) {
     const success = readTicketSuccess(expectedTitle);
     if (success?.titleMatches) {
       return { ok: true, reference: success.reference };
@@ -593,7 +593,7 @@ async function attachFieldImages(control, images, label) {
     // Do not submit while an import is still pending or unconfirmed.
     await waitUntil(() => currentControl().value !== previousValue
       || [...readImportedImageSources(container.isConnected === false ? findImageFieldContainer(currentControl()) : container)]
-        .some((source) => !previousImages.has(source)), 30000,
+        .some((source) => !previousImages.has(source)), 60000,
       `Central no confirmo la imagen ${attachment.name} en ${label}. Revisa el ticket antes de reintentar.`);
   }
 }

@@ -744,7 +744,7 @@ async function sendToTab(tabId, message) {
 
 async function waitForTicketList(tabId) {
   const started = Date.now();
-  while (Date.now() - started < 20000) {
+  while (Date.now() - started < 60000) {
     try {
       const result = await chrome.tabs.sendMessage(tabId, { type: "central.listReady" });
       if (result?.ready) return;
@@ -761,7 +761,7 @@ function waitForTab(tabId) {
     const timeout = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
       resolve();
-    }, 15000);
+    }, 60000);
     const listener = (updatedId, changeInfo) => {
       if (updatedId === tabId && changeInfo.status === "complete") {
         clearTimeout(timeout);
