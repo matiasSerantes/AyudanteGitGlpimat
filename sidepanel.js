@@ -26,11 +26,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   await centralLog("info", "panel.open");
   setupImageAttachments();
   bindEvents();
+  // Session detection must not wait for remote catalogs or templates.
+  void checkConnection();
   await loadCatalogs();
   await restoreState();
   await loadTemplates();
   renderQueue();
-  await checkConnection();
   await refreshCatalogsFromCentral();
 });
 
@@ -51,6 +52,7 @@ async function exportDiagnosticLog() {
 }
 
 function bindEvents() {
+  $("#checkConnectionButton").addEventListener("click", () => checkConnection(true));
   $("#exportLogButton").addEventListener("click", exportDiagnosticLog);
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
@@ -688,15 +690,44 @@ async function openCentral() {
   showToast("Inicia sesion y luego vuelve a la cola.");
 }
 
-async function checkConnection() {
+let checkingConnection = false;
+async function checkConnection(manual = false) {
+  if (checkingConnection) return;
+  checkingConnection = true;
+  const button = $("#checkConnectionButton");
+  button.disabled = true;
+  button.textContent = "Comprobando...";
+  showDisconnected("Comprobando...");
   try {
     const tabs = await chrome.tabs.query({ url: ["https://operaciones.smartsouth.net/*", "https://central.smartsouth.net/*"] });
     if (!tabs.length) return showDisconnected("Central no esta abierto");
-    const probe = await sendToTab(tabs[0].id, { type: "central.probe" });
-    if (probe?.ready) showConnected();
-    else showLoginState(probe?.reason || "Sesion no disponible");
-  } catch (_) {
-    showDisconnected("Sin comprobar");
+    let reason = "";
+    let connectionError;
+    for (const tab of [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)))) {
+      try {
+        let timeout;
+        const probe = await Promise.race([
+          sendToTab(tab.id, { type: "central.probe" }),
+          new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Central no respondio. Recarga la pagina y vuelve a comprobar.")), 10000); })
+        ]).finally(() => clearTimeout(timeout));
+        if (probe?.ready) {
+          showConnected();
+          if (manual) showToast("Sesion de Central comprobada.");
+          return;
+        }
+        reason = probe?.reason || "Sesion no disponible";
+      } catch (error) { connectionError = error; }
+    }
+    if (reason) showLoginState(reason);
+    else throw connectionError || new Error("No se pudo comprobar Central.");
+  } catch (error) {
+    showDisconnected("Sin conexion");
+    await centralLog("warn", "connection.check.failed", { message: error.message });
+    if (manual) showToast(error.message, true);
+  } finally {
+    checkingConnection = false;
+    button.disabled = false;
+    button.textContent = "Volver a comprobar";
   }
 }
 
@@ -711,6 +742,7 @@ function showDisconnected(text) {
   const badge = $("#connectionBadge");
   badge.textContent = text;
   badge.className = "badge neutral";
+  $("#loginNotice").classList.add("hidden");
 }
 
 function showLoginState(reason) {
