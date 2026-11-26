@@ -13,7 +13,7 @@ function setup(alerts = [], successAt = Infinity) {
     delay: async ms => { now += ms; },
     readTicketSuccess: () => now >= successAt ? { titleMatches: true, reference: '#7003' } : null,
     findButton: () => null,
-    TICKET_CLOSURE_TIMEOUT: 60000,
+    TICKET_CLOSURE_TIMEOUT: Number(source.match(/const TICKET_CLOSURE_TIMEOUT = (\d+)/)[1]),
     readTicketDetail: () => now >= successAt ? null : {},
     isTicketCompleted: () => now >= successAt,
     returnAfterCompletion: async () => {}
@@ -58,6 +58,6 @@ test('slow creation is confirmed after 55 seconds without resubmitting', async (
   assert.equal(result.reference, '#7003');
 });
 
-test('slow closure can finish after 55 seconds', async () => {
-  await vm.runInContext('waitForTicketClosure("#7003")', setup([], 55000));
+test('slow closure can finish after 70 seconds', async () => {
+  await vm.runInContext('waitForTicketClosure("#7003")', setup([], 70000));
 });

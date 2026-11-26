@@ -2,7 +2,7 @@ if (!globalThis.centralContentLoaded) {
 globalThis.centralContentLoaded = true;
 const CONTROL_TIMEOUT = 60000;
 const WORK_SAVE_TIMEOUT = 60000;
-const TICKET_CLOSURE_TIMEOUT = 60000;
+const TICKET_CLOSURE_TIMEOUT = 75000;
 const POST_CLOSURE_RETURN_TIMEOUT = 60000;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
