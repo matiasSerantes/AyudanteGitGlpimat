@@ -42,6 +42,7 @@ h1 { font-size: 21px; }
 h2 { font-size: 20px; }
 
 .badge {
+  border: 0;
   flex: none;
   max-width: 128px;
   padding: 6px 8px;
@@ -51,8 +52,7 @@ h2 { font-size: 20px; }
   text-align: center;
 }
 
-.connection-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.connection-controls button { font-size: 12px; padding: 6px 8px; }
+.badge:focus-visible { outline: 2px solid white; outline-offset: 3px; }
 .badge.neutral { color: #d7e2e8; background: #244459; }
 .badge.ok { color: #063a36; background: #91dfd3; }
 .badge.warn { color: #5b3700; background: #f4cc71; }

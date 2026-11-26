@@ -52,7 +52,7 @@ async function exportDiagnosticLog() {
 }
 
 function bindEvents() {
-  $("#checkConnectionButton").addEventListener("click", () => checkConnection(true));
+  $("#connectionBadge").addEventListener("click", () => checkConnection(true));
   $("#exportLogButton").addEventListener("click", exportDiagnosticLog);
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
@@ -694,7 +694,7 @@ let checkingConnection = false;
 async function checkConnection(manual = false) {
   if (checkingConnection) return;
   checkingConnection = true;
-  const button = $("#checkConnectionButton");
+  const button = $("#connectionBadge");
   button.disabled = true;
   button.textContent = "Comprobando...";
   showDisconnected("Comprobando...");
@@ -727,7 +727,6 @@ async function checkConnection(manual = false) {
   } finally {
     checkingConnection = false;
     button.disabled = false;
-    button.textContent = "Volver a comprobar";
   }
 }
 
