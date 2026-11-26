@@ -37,6 +37,12 @@ test('new validation errors still stop creation', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.error, 'Campo obligatorio');
 });
+
+test('new Central work validation is reported instead of timing out', async () => {
+  const message = 'Completá el detalle del trabajo o motivo de Sin intervención. No se guardó ningún cambio.';
+  const result = await vm.runInContext('waitForSubmission("test")', setup([{ visible: true, textContent: message }]));
+  assert.equal(result.error, message);
+});
 test('uncertain creation without success times out safely', async () => {
   const result = await vm.runInContext('waitForSubmission("test")', setup([{ visible: true, textContent: 'No se pudo confirmar la operación' }]));
   assert.equal(result.ok, false);

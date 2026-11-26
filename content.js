@@ -166,6 +166,10 @@ async function finalizeTicket(ticket) {
     await returnAfterCompletion(ticket.ticketReference);
     return { ok: true, reference: ticket.ticketReference, warnings };
   }
+  // Central now requires a reason for every intervention, including zero hours.
+  // Older queued tickets may only contain the customer solution.
+  ticket = { ...ticket, workDetail: ticket.workDetail?.trim() || ticket.customerMessage?.trim() || "" };
+  if (!ticket.workDetail) throw new Error("Completa el detalle del trabajo o la solucion antes de cerrar el ticket.");
   await setSelect("tiempo facturable", ticket.billableTime);
   setCustomerMessage(ticket.customerMessage);
   for (const [field, label] of [["workDetail", "detalle para el cliente / motivo"], ["internalNote", "nota interna"], ["customerMessage", "mensaje al cliente / solucion"]]) {
@@ -252,7 +256,7 @@ async function waitForOperationalCloseButton() {
     await delay(200);
   }
   await centralLog("warn", "finalize.workSaveTimeout", { elapsedMs: Date.now() - started });
-  throw new Error("Central no habilito Cerrar en 45 segundos despues de completar el trabajo. Revisa el guardado y los campos obligatorios antes de reanudar la cola.");
+  throw new Error("Central no habilito Cerrar en 60 segundos despues de completar el trabajo. Revisa el guardado y los campos obligatorios antes de reanudar la cola.");
 }
 
 function isTicketCompleted(reference) {
@@ -331,7 +335,7 @@ function findControl(labelText, preferredTag) {
   const selector = preferredTag || "input, textarea, select, [role=combobox]";
   const captions = [...document.querySelectorAll("label, h1, h2, h3, h4, h5, h6, span, p, div")]
     .filter((node) => isVisible(node)
-      && normalize(node.textContent).replace(/\s*\(opcional\)$/, "").trim() === target);
+      && normalize(node.textContent).replace(/\s*\(opcional\)$/, "").split("·")[0].trim() === target);
   for (const caption of captions) {
     let container = caption;
     while (container && container !== document.body) {
@@ -428,7 +432,7 @@ function readVisibleErrors() {
   return [...document.querySelectorAll('[role="alert"], .alert-danger, .error, .toast')]
     .filter(isVisible)
     .map(node => node.textContent.trim())
-    .filter(text => /error|obligatorio|invalido|no se pudo/.test(normalize(text)));
+    .filter(text => /error|obligatorio|invalido|no se pudo|no se guardo ningun cambio|completa el detalle/.test(normalize(text)));
 }
 
 function readOperationError(previousErrors) {
